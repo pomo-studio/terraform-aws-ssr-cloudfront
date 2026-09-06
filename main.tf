@@ -146,25 +146,33 @@ resource "aws_cloudfront_distribution" "main" {
     compress               = true
   }
 
-  ordered_cache_behavior {
-    path_pattern     = "/favicon.ico"
-    allowed_methods  = ["GET", "HEAD", "OPTIONS"]
-    cached_methods   = ["GET", "HEAD"]
-    target_origin_id = "origin-group-static-assets"
+  # Root-level static files. Previously this was a single hardcoded
+  # /favicon.ico behaviour, which meant anything else at the root - robots.txt,
+  # sitemap.xml, apple-touch-icon.png - was uploaded with the static assets but
+  # resolved against the Lambda and 404'd. The default keeps the old behaviour.
+  dynamic "ordered_cache_behavior" {
+    for_each = var.static_root_path_patterns
 
-    forwarded_values {
-      query_string = false
+    content {
+      path_pattern     = ordered_cache_behavior.value
+      allowed_methods  = ["GET", "HEAD", "OPTIONS"]
+      cached_methods   = ["GET", "HEAD"]
+      target_origin_id = "origin-group-static-assets"
 
-      cookies {
-        forward = "none"
+      forwarded_values {
+        query_string = false
+
+        cookies {
+          forward = "none"
+        }
       }
-    }
 
-    viewer_protocol_policy = "redirect-to-https"
-    min_ttl                = 86400
-    default_ttl            = 604800
-    max_ttl                = 31536000
-    compress               = true
+      viewer_protocol_policy = "redirect-to-https"
+      min_ttl                = 86400
+      default_ttl            = 604800
+      max_ttl                = 31536000
+      compress               = true
+    }
   }
 
   viewer_certificate {

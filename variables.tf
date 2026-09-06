@@ -66,3 +66,9 @@ variable "common_tags" {
   type    = map(string)
   default = {}
 }
+
+variable "static_root_path_patterns" {
+  description = "Path patterns served from the static assets origin instead of the SSR Lambda. Root-level files such as /favicon.ico, /robots.txt or /apple-touch-icon.png ship with the static assets but would otherwise resolve against the Lambda and 404. Wildcards are allowed, e.g. /favicon*."
+  type        = list(string)
+  default     = ["/favicon.ico"]
+}
