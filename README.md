@@ -1,13 +1,81 @@
 # terraform-aws-ssr-cloudfront
 
-[![Terraform Validation](https://github.com/pomo-studio/terraform-aws-ssr-cloudfront/actions/workflows/terraform.yml/badge.svg)](https://github.com/pomo-studio/terraform-aws-ssr-cloudfront/actions/workflows/terraform.yml)
-[![Terraform Registry](https://img.shields.io/badge/terraform-registry-844FBA?logo=terraform)](https://registry.terraform.io/modules/pomo-studio/ssr-cloudfront/aws)
+The CloudFront distribution for a serverless SSR stack: two Lambda origins with automatic
+failover, an S3 origin for static assets, and cache behaviours tuned for server-rendered
+pages.
 
-- [Changelog](CHANGELOG.md)
+This module is composed by [`serverless-ssr`](https://registry.terraform.io/modules/pomo-studio/serverless-ssr/aws)
+and published separately for callers who want to assemble the pieces themselves. It
+expects policy and origin-access IDs from
+[`ssr-cloudfront-support`](https://registry.terraform.io/modules/pomo-studio/ssr-cloudfront-support/aws),
+bucket domains from [`ssr-storage`](https://registry.terraform.io/modules/pomo-studio/ssr-storage/aws),
+and a certificate from [`ssr-dns`](https://registry.terraform.io/modules/pomo-studio/ssr-dns/aws)
+or anywhere else.
 
-Reusable CloudFront distribution module for SSR stacks.
+## What it creates
 
-This module provisions the multi-origin distribution used by serverless SSR, including Lambda origins, static asset origins, and cache/origin request policy wiring.
+- A CloudFront distribution with an **origin group** across two regions
+- Ordered cache behaviours for `/api/*` (Lambda), `/_nuxt/*` (S3) and configurable root paths
+- A default behaviour sending everything else to the primary Lambda function URL
+
+## Design decisions
+
+**Failover without DNS.** The Lambda origins sit in an origin group, so a 5xx from the
+primary is retried against the DR origin on the same request. No Route 53 health checks,
+no TTL to wait out.
+
+**Stale-while-revalidate for SSR.** The cache policy honours the origin's
+`Cache-Control`, so the Lambda decides freshness and CloudFront serves the cached copy
+while it refreshes.
+
+**Static paths are configurable.** `static_root_path_patterns` controls which root-level
+files come from S3 rather than the Lambda. It defaults to `["/favicon.ico"]`; add
+`/robots.txt` or `/apple-touch-icon.png` if you serve them, or they will resolve against
+the Lambda and 404.
+
+## Usage
+
+```hcl
+module "cloudfront" {
+  source  = "pomo-studio/ssr-cloudfront/aws"
+  version = "~> 0.3"
+
+  providers = { aws = aws.primary }
+
+  app_name             = "my-app"
+  enable_custom_domain = true
+  full_domain          = "www.example.com"
+  certificate_arn      = module.dns.certificate_arn # must be in us-east-1
+
+  static_root_path_patterns = ["/favicon*", "/robots.txt"]
+
+  enable_dr                   = true
+  primary_region              = "us-east-1"
+  dr_region                   = "us-west-2"
+  primary_lambda_function_url = aws_lambda_function_url.primary.function_url
+  dr_lambda_function_url      = aws_lambda_function_url.dr[0].function_url
+
+  static_assets_regional_domain_name    = module.storage.static_assets_regional_domain_name
+  static_assets_dr_regional_domain_name = module.storage.static_assets_dr_regional_domain_name
+
+  lambda_oac_id                          = module.cloudfront_support.lambda_oac_id
+  oai_cloudfront_access_identity_path    = module.cloudfront_support.oai_cloudfront_access_identity_path
+  lambda_signed_origin_request_policy_id = module.cloudfront_support.lambda_signed_origin_request_policy_id
+  ssr_swr_cache_policy_id                = module.cloudfront_support.ssr_swr_cache_policy_id
+
+  common_tags = { Project = "my-app" }
+}
+```
+
+Set `enable_custom_domain = false` to serve on the `cloudfront.net` domain only, in which
+case `full_domain` and `certificate_arn` are not required.
+
+## Notes
+
+- `certificate_arn` **must** be in `us-east-1`. CloudFront accepts certificates from no
+  other region.
+- Distribution changes take several minutes to deploy. `terraform apply` returns once
+  CloudFront accepts the change, not once it has propagated to every edge.
 
 <!-- BEGIN_TF_DOCS -->
 ## Requirements
