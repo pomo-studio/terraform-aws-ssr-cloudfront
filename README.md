@@ -1,39 +1,26 @@
 # terraform-aws-ssr-cloudfront
 
-The CloudFront distribution for a serverless SSR stack: two Lambda origins with automatic
-failover, an S3 origin for static assets, and cache behaviours tuned for server-rendered
-pages.
+The CloudFront distribution for a server-rendered site. Two Lambda origins that fail over
+to one another, an S3 origin for static files, and caching tuned for pages built on
+request.
 
-This module is composed by [`serverless-ssr`](https://registry.terraform.io/modules/pomo-studio/serverless-ssr/aws)
-and published separately for callers who want to assemble the pieces themselves. It
-expects policy and origin-access IDs from
-[`ssr-cloudfront-support`](https://registry.terraform.io/modules/pomo-studio/ssr-cloudfront-support/aws),
-bucket domains from [`ssr-storage`](https://registry.terraform.io/modules/pomo-studio/ssr-storage/aws),
-and a certificate from [`ssr-dns`](https://registry.terraform.io/modules/pomo-studio/ssr-dns/aws)
-or anywhere else.
+**You probably want [serverless-ssr](https://registry.terraform.io/modules/pomo-studio/serverless-ssr/aws) instead.**
+It wires this together with the Lambda, storage and DNS pieces and gives you a working
+site. Come here if you are assembling the parts yourself.
 
-## What it creates
+## What you get
 
-- A CloudFront distribution with an **origin group** across two regions
-- Ordered cache behaviours for `/api/*` (Lambda), `/_nuxt/*` (S3) and configurable root paths
-- A default behaviour sending everything else to the primary Lambda function URL
+One CloudFront distribution, set up so that:
 
-## Design decisions
+- `/api/*` goes to the Lambda
+- `/_nuxt/*` and any root files you nominate come from S3
+- everything else is server-rendered by the Lambda
+- if the primary region returns a 5xx, the same request is retried against the DR region
 
-**Failover without DNS.** The Lambda origins sit in an origin group, so a 5xx from the
-primary is retried against the DR origin on the same request. No Route 53 health checks,
-no TTL to wait out.
+That last point is worth pausing on. Failover happens inside CloudFront, on the request
+that failed. There are no health checks to configure and no DNS record to wait on.
 
-**Stale-while-revalidate for SSR.** The cache policy honours the origin's
-`Cache-Control`, so the Lambda decides freshness and CloudFront serves the cached copy
-while it refreshes.
-
-**Static paths are configurable.** `static_root_path_patterns` controls which root-level
-files come from S3 rather than the Lambda. It defaults to `["/favicon.ico"]`; add
-`/robots.txt` or `/apple-touch-icon.png` if you serve them, or they will resolve against
-the Lambda and 404.
-
-## Usage
+## Using it
 
 ```hcl
 module "cloudfront" {
@@ -45,7 +32,7 @@ module "cloudfront" {
   app_name             = "my-app"
   enable_custom_domain = true
   full_domain          = "www.example.com"
-  certificate_arn      = module.dns.certificate_arn # must be in us-east-1
+  certificate_arn      = module.dns.certificate_arn
 
   static_root_path_patterns = ["/favicon*", "/robots.txt"]
 
@@ -67,15 +54,25 @@ module "cloudfront" {
 }
 ```
 
-Set `enable_custom_domain = false` to serve on the `cloudfront.net` domain only, in which
-case `full_domain` and `certificate_arn` are not required.
+Four of those inputs come from
+[ssr-cloudfront-support](https://registry.terraform.io/modules/pomo-studio/ssr-cloudfront-support/aws)
+and two from [ssr-storage](https://registry.terraform.io/modules/pomo-studio/ssr-storage/aws).
+Set `enable_custom_domain = false` to serve on the `cloudfront.net` domain, and you can
+skip `full_domain` and `certificate_arn`.
 
-## Notes
+## Worth knowing
 
-- `certificate_arn` **must** be in `us-east-1`. CloudFront accepts certificates from no
-  other region.
-- Distribution changes take several minutes to deploy. `terraform apply` returns once
-  CloudFront accepts the change, not once it has propagated to every edge.
+**The certificate has to be in us-east-1.** CloudFront accepts no other region. If you
+have a wildcard certificate elsewhere in your account, this is the one thing you cannot
+reuse across regions.
+
+**Name every root file you serve.** `static_root_path_patterns` decides what comes from
+S3 rather than the Lambda, and it defaults to `["/favicon.ico"]`. A `robots.txt` you
+forget to list will be uploaded to S3 and still return 404, because the request goes to
+the Lambda instead.
+
+**Applies are slow.** CloudFront takes a few minutes to deploy a change, and Terraform
+returns when the change is accepted, not when every edge has it.
 
 <!-- BEGIN_TF_DOCS -->
 ## Requirements
