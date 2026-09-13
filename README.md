@@ -1,26 +1,19 @@
 # terraform-aws-ssr-cloudfront
 
-The CloudFront distribution for a server-rendered site. Two Lambda origins that fail over
-to one another, an S3 origin for static files, and caching tuned for pages built on
-request.
+[![Terraform Validation](https://github.com/pomo-studio/terraform-aws-ssr-cloudfront/actions/workflows/terraform.yml/badge.svg)](https://github.com/pomo-studio/terraform-aws-ssr-cloudfront/actions/workflows/terraform.yml)
+[![Terraform Registry](https://img.shields.io/badge/terraform-registry-844FBA?logo=terraform)](https://registry.terraform.io/modules/pomo-studio/ssr-cloudfront/aws)
 
-**You probably want [serverless-ssr](https://registry.terraform.io/modules/pomo-studio/serverless-ssr/aws) instead.**
-It wires this together with the Lambda, storage and DNS pieces and gives you a working
-site. Come here if you are assembling the parts yourself.
+[Changelog](CHANGELOG.md)
 
-## What you get
+The CloudFront distribution for a server-rendered site: two Lambda origins that fail over to one another, an S3 origin for static files, and caching tuned for pages built on request.
 
-One CloudFront distribution, set up so that:
+## When to use it
 
-- `/api/*` goes to the Lambda
-- `/_nuxt/*` and any root files you nominate come from S3
-- everything else is server-rendered by the Lambda
-- if the primary region returns a 5xx, the same request is retried against the DR region
+Use this component when you are assembling the SSR delivery stack yourself. It configures routing, failover, and caching across the Lambda and storage origins you already have.
 
-That last point is worth pausing on. Failover happens inside CloudFront, on the request
-that failed. There are no health checks to configure and no DNS record to wait on.
+If you want a working site rather than the parts, use [`pomo-studio/serverless-ssr/aws`](https://registry.terraform.io/modules/pomo-studio/serverless-ssr/aws); it wires this together with the Lambda, storage, and DNS pieces.
 
-## Using it
+## Quickstart
 
 ```hcl
 module "cloudfront" {
@@ -54,25 +47,25 @@ module "cloudfront" {
 }
 ```
 
-Four of those inputs come from
-[ssr-cloudfront-support](https://registry.terraform.io/modules/pomo-studio/ssr-cloudfront-support/aws)
-and two from [ssr-storage](https://registry.terraform.io/modules/pomo-studio/ssr-storage/aws).
-Set `enable_custom_domain = false` to serve on the `cloudfront.net` domain, and you can
-skip `full_domain` and `certificate_arn`.
+## What it creates
 
-## Worth knowing
+One distribution, set up so that:
 
-**The certificate has to be in us-east-1.** CloudFront accepts no other region. If you
-have a wildcard certificate elsewhere in your account, this is the one thing you cannot
-reuse across regions.
+- `/api/*` goes to the Lambda.
+- `/_nuxt/*` and any root files you nominate come from S3.
+- Everything else is server-rendered by the Lambda.
+- If the primary region returns a 5xx, the same request is retried against the DR region.
 
-**Name every root file you serve.** `static_root_path_patterns` decides what comes from
-S3 rather than the Lambda, and it defaults to `["/favicon.ico"]`. A `robots.txt` you
-forget to list will be uploaded to S3 and still return 404, because the request goes to
-the Lambda instead.
+## Design decisions
 
-**Applies are slow.** CloudFront takes a few minutes to deploy a change, and Terraform
-returns when the change is accepted, not when every edge has it.
+- **Failover happens inside CloudFront, on the request that failed.** There are no health checks to configure and no DNS record to wait on.
+- **The certificate must be in `us-east-1`.** CloudFront accepts no other region, which is the one thing you cannot reuse across regions if you hold a wildcard certificate elsewhere.
+- **Name every root file you serve.** `static_root_path_patterns` decides what comes from S3 rather than the Lambda, and it defaults to `["/favicon.ico"]`. A `robots.txt` you forget to list is uploaded to S3 and still returns 404, because the request goes to the Lambda.
+- **Applies are slow.** CloudFront takes a few minutes to deploy a change, and Terraform returns when the change is accepted, not when every edge has it.
+
+## Examples
+
+- [Basic](examples/basic/)
 
 ## Reference
 
@@ -136,3 +129,11 @@ No modules.
 <!-- END_TF_DOCS -->
 
 </details>
+
+## Support and license
+
+Part of the [pomo-studio](https://github.com/pomo-studio) Terraform components, run in production by [postmodern.](https://pomo.studio). Regenerate the reference with `terraform-docs` v0.20.0 (`terraform-docs .`); CI fails on drift.
+
+See the [contribution guide](https://github.com/pomo-studio/.github/blob/main/CONTRIBUTING.md) and [security policy](https://github.com/pomo-studio/.github/blob/main/SECURITY.md).
+
+MIT licensed. See [LICENSE](LICENSE).
