@@ -9,9 +9,9 @@ The CloudFront distribution for a server-rendered site: two Lambda origins that 
 
 ## When to use it
 
-Use this component when you are assembling the SSR delivery stack yourself. It configures routing, failover, and caching across the Lambda and storage origins you already have.
+Put CloudFront in front of two Lambda origins, with an S3 origin for static files. The primary region serves requests, and the same request is retried against the DR region when the primary returns a 5xx.
 
-If you want a working site rather than the parts, use [`pomo-studio/serverless-ssr/aws`](https://registry.terraform.io/modules/pomo-studio/serverless-ssr/aws); it wires this together with the Lambda, storage, and DNS pieces.
+Use it for any site or API where a rendered origin should sit behind a CDN with regional failover, whether or not the framework is Nuxt or Next. It is also the delivery layer of the [Serverless SSR blueprint](https://registry.terraform.io/modules/pomo-studio/serverless-ssr/aws).
 
 ## Quickstart
 
