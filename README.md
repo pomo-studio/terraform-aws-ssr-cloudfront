@@ -74,6 +74,11 @@ the Lambda instead.
 **Applies are slow.** CloudFront takes a few minutes to deploy a change, and Terraform
 returns when the change is accepted, not when every edge has it.
 
+## Reference
+
+<details>
+<summary>Reference</summary>
+
 <!-- BEGIN_TF_DOCS -->
 ## Requirements
 
@@ -129,3 +134,5 @@ No modules.
 | <a name="output_hosted_zone_id"></a> [hosted\_zone\_id](#output\_hosted\_zone\_id) | CloudFront hosted zone ID, required when creating a Route 53 alias record to the distribution. |
 | <a name="output_id"></a> [id](#output\_id) | ID of the CloudFront distribution. |
 <!-- END_TF_DOCS -->
+
+</details>
