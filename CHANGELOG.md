@@ -2,6 +2,12 @@
 
 All notable changes to this module are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow [Semantic Versioning](https://semver.org/).
 
+## [v0.3.4] - 2026-09-12
+
+### Added
+
+- terraform-docs-generated interface documentation in README (Requirements/Providers/Inputs/Outputs) with a CI drift check.
+
 ## [v0.3.3] - 2026-09-07
 
 ### Changed
