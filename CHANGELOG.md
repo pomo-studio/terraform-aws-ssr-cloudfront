@@ -2,6 +2,12 @@
 
 All notable changes to this module are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow [Semantic Versioning](https://semver.org/).
 
+## [v0.3.5] - 2026-09-12
+
+### Fixed
+
+- terraform-docs drift check now uses `fail-on-diff` because `terraform-docs/gh-actions` v1.4.1 does not support the `--check` argument.
+
 ## [v0.3.4] - 2026-09-12
 
 ### Added

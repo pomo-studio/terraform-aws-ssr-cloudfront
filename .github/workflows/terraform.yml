@@ -97,4 +97,6 @@ jobs:
           working-dir: .
           output-file: README.md
           output-method: inject
-          args: --check
+          # terraform-docs/gh-actions v1.4.1 does not support the --check flag,
+          # so fail-on-diff is used to enforce that README.md is up to date.
+          fail-on-diff: true
