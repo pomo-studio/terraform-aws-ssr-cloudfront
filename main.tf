@@ -9,40 +9,55 @@ terraform {
   }
 }
 
+# An origin group needs two members, so without DR the behaviors target the
+# primary origins directly and the DR origins and origin groups are omitted.
+locals {
+  lambda_target_origin_id = var.enable_dr ? "origin-group-primary-dr" : "primary-lambda"
+  static_target_origin_id = var.enable_dr ? "origin-group-static-assets" : "static-assets-primary"
+}
+
 resource "aws_cloudfront_distribution" "main" {
   enabled = true
   comment = "${var.app_name} - Multi-region SSR"
   aliases = var.enable_custom_domain ? [var.full_domain] : []
 
-  origin_group {
-    origin_id = "origin-group-primary-dr"
+  dynamic "origin_group" {
+    for_each = var.enable_dr ? [1] : []
 
-    failover_criteria {
-      status_codes = [500, 502, 503, 504]
-    }
+    content {
+      origin_id = "origin-group-primary-dr"
 
-    member {
-      origin_id = "primary-lambda"
-    }
+      failover_criteria {
+        status_codes = [500, 502, 503, 504]
+      }
 
-    member {
-      origin_id = "dr-lambda"
+      member {
+        origin_id = "primary-lambda"
+      }
+
+      member {
+        origin_id = "dr-lambda"
+      }
     }
   }
 
-  origin_group {
-    origin_id = "origin-group-static-assets"
+  dynamic "origin_group" {
+    for_each = var.enable_dr ? [1] : []
 
-    failover_criteria {
-      status_codes = [500, 502, 503, 504]
-    }
+    content {
+      origin_id = "origin-group-static-assets"
 
-    member {
-      origin_id = "static-assets-primary"
-    }
+      failover_criteria {
+        status_codes = [500, 502, 503, 504]
+      }
 
-    member {
-      origin_id = "static-assets-dr"
+      member {
+        origin_id = "static-assets-primary"
+      }
+
+      member {
+        origin_id = "static-assets-dr"
+      }
     }
   }
 
@@ -59,16 +74,20 @@ resource "aws_cloudfront_distribution" "main" {
     }
   }
 
-  origin {
-    domain_name              = var.enable_dr ? regex("https://([^/]+)/?", var.dr_lambda_function_url)[0] : ""
-    origin_id                = "dr-lambda"
-    origin_access_control_id = var.lambda_oac_id
+  dynamic "origin" {
+    for_each = var.enable_dr ? [1] : []
 
-    custom_origin_config {
-      http_port              = 443
-      https_port             = 443
-      origin_protocol_policy = "https-only"
-      origin_ssl_protocols   = ["TLSv1.2"]
+    content {
+      domain_name              = regex("https://([^/]+)/?", var.dr_lambda_function_url)[0]
+      origin_id                = "dr-lambda"
+      origin_access_control_id = var.lambda_oac_id
+
+      custom_origin_config {
+        http_port              = 443
+        https_port             = 443
+        origin_protocol_policy = "https-only"
+        origin_ssl_protocols   = ["TLSv1.2"]
+      }
     }
   }
 
@@ -86,17 +105,21 @@ resource "aws_cloudfront_distribution" "main" {
     }
   }
 
-  origin {
-    domain_name = var.enable_dr ? var.static_assets_dr_regional_domain_name : ""
-    origin_id   = "static-assets-dr"
+  dynamic "origin" {
+    for_each = var.enable_dr ? [1] : []
 
-    s3_origin_config {
-      origin_access_identity = var.oai_cloudfront_access_identity_path
-    }
+    content {
+      domain_name = var.static_assets_dr_regional_domain_name
+      origin_id   = "static-assets-dr"
 
-    custom_header {
-      name  = "X-Origin-Region"
-      value = var.dr_region
+      s3_origin_config {
+        origin_access_identity = var.oai_cloudfront_access_identity_path
+      }
+
+      custom_header {
+        name  = "X-Origin-Region"
+        value = var.dr_region
+      }
     }
   }
 
@@ -116,7 +139,7 @@ resource "aws_cloudfront_distribution" "main" {
   default_cache_behavior {
     allowed_methods  = ["GET", "HEAD", "OPTIONS"]
     cached_methods   = ["GET", "HEAD"]
-    target_origin_id = "origin-group-primary-dr"
+    target_origin_id = local.lambda_target_origin_id
 
     cache_policy_id          = var.ssr_swr_cache_policy_id
     origin_request_policy_id = var.lambda_signed_origin_request_policy_id
@@ -129,7 +152,7 @@ resource "aws_cloudfront_distribution" "main" {
     path_pattern     = "/_nuxt/*"
     allowed_methods  = ["GET", "HEAD", "OPTIONS"]
     cached_methods   = ["GET", "HEAD"]
-    target_origin_id = "origin-group-static-assets"
+    target_origin_id = local.static_target_origin_id
 
     forwarded_values {
       query_string = false
@@ -157,7 +180,7 @@ resource "aws_cloudfront_distribution" "main" {
       path_pattern     = ordered_cache_behavior.value
       allowed_methods  = ["GET", "HEAD", "OPTIONS"]
       cached_methods   = ["GET", "HEAD"]
-      target_origin_id = "origin-group-static-assets"
+      target_origin_id = local.static_target_origin_id
 
       forwarded_values {
         query_string = false

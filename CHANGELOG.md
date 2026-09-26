@@ -2,6 +2,13 @@
 
 All notable changes to this module are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow [Semantic Versioning](https://semver.org/).
 
+## [v0.3.6] - 2026-09-26
+
+### Fixed
+
+- `enable_dr = false` no longer fails on apply ([serverless-ssr#29](https://github.com/pomo-studio/terraform-aws-serverless-ssr/issues/29)). The DR Lambda and DR static-assets origins were created unconditionally with an empty `domain_name`, which CloudFront rejects. The DR origins and both origin groups are now created only with DR on; without DR, behaviors target `primary-lambda` and `static-assets-primary` directly.
+- With `enable_dr = true` the distribution configuration is unchanged (verified: no plan diff on a live DR-enabled stack).
+
 ## [v0.3.5] - 2026-09-12
 
 ### Fixed
