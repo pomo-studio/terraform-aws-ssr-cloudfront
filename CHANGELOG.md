@@ -2,6 +2,13 @@
 
 All notable changes to this module are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow [Semantic Versioning](https://semver.org/).
 
+## [v0.4.0] - 2026-10-02
+
+### Added
+
+- `additional_aliases` (default `[]`): extra hostnames accepted by the distribution. A CloudFront Function (`cloudfront-js-2.0`, viewer request, on every cache behavior) returns a 301 from each to `full_domain`, keeping the path and every query parameter and value. Parameter order is not preserved and a bare `x=` becomes `x`: CloudFront hands the function the query string already parsed.
+- With the default, plans are unchanged: no function is created and no behavior gets a function association.
+
 ## [v0.3.6] - 2026-09-26
 
 ### Fixed

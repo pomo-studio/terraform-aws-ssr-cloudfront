@@ -14,12 +14,48 @@ terraform {
 locals {
   lambda_target_origin_id = var.enable_dr ? "origin-group-primary-dr" : "primary-lambda"
   static_target_origin_id = var.enable_dr ? "origin-group-static-assets" : "static-assets-primary"
+
+  # Additional hostnames are accepted and 301-redirected to full_domain.
+  redirect_additional = var.enable_custom_domain && length(var.additional_aliases) > 0
+}
+
+resource "aws_cloudfront_function" "host_redirect" {
+  count = local.redirect_additional ? 1 : 0
+
+  name    = substr("${var.app_name}-host-redirect", 0, 64)
+  runtime = "cloudfront-js-2.0"
+  comment = "301 additional hostnames to the primary domain"
+  publish = true
+  code    = <<-EOT
+    function handler(event) {
+      var request = event.request;
+      var primary = ${jsonencode(var.full_domain)};
+      var host = request.headers.host ? request.headers.host.value.toLowerCase() : primary;
+      if (host === primary) {
+        return request;
+      }
+      var parts = [];
+      for (var key in request.querystring) {
+        var param = request.querystring[key];
+        var values = param.multiValue ? param.multiValue : [param];
+        for (var i = 0; i < values.length; i++) {
+          parts.push(values[i].value === '' ? key : key + '=' + values[i].value);
+        }
+      }
+      var location = 'https://' + primary + request.uri + (parts.length ? '?' + parts.join('&') : '');
+      return {
+        statusCode: 301,
+        statusDescription: 'Moved Permanently',
+        headers: { location: { value: location } }
+      };
+    }
+  EOT
 }
 
 resource "aws_cloudfront_distribution" "main" {
   enabled = true
   comment = "${var.app_name} - Multi-region SSR"
-  aliases = var.enable_custom_domain ? [var.full_domain] : []
+  aliases = var.enable_custom_domain ? concat([var.full_domain], var.additional_aliases) : []
 
   dynamic "origin_group" {
     for_each = var.enable_dr ? [1] : []
@@ -134,6 +170,14 @@ resource "aws_cloudfront_distribution" "main" {
 
     viewer_protocol_policy = "redirect-to-https"
     compress               = true
+
+    dynamic "function_association" {
+      for_each = local.redirect_additional ? [1] : []
+      content {
+        event_type   = "viewer-request"
+        function_arn = aws_cloudfront_function.host_redirect[0].arn
+      }
+    }
   }
 
   default_cache_behavior {
@@ -146,6 +190,14 @@ resource "aws_cloudfront_distribution" "main" {
 
     viewer_protocol_policy = "redirect-to-https"
     compress               = true
+
+    dynamic "function_association" {
+      for_each = local.redirect_additional ? [1] : []
+      content {
+        event_type   = "viewer-request"
+        function_arn = aws_cloudfront_function.host_redirect[0].arn
+      }
+    }
   }
 
   ordered_cache_behavior {
@@ -167,6 +219,14 @@ resource "aws_cloudfront_distribution" "main" {
     default_ttl            = 604800
     max_ttl                = 31536000
     compress               = true
+
+    dynamic "function_association" {
+      for_each = local.redirect_additional ? [1] : []
+      content {
+        event_type   = "viewer-request"
+        function_arn = aws_cloudfront_function.host_redirect[0].arn
+      }
+    }
   }
 
   # Root-level static files. Previously this was a single hardcoded
@@ -195,6 +255,14 @@ resource "aws_cloudfront_distribution" "main" {
       default_ttl            = 604800
       max_ttl                = 31536000
       compress               = true
+
+      dynamic "function_association" {
+        for_each = local.redirect_additional ? [1] : []
+        content {
+          event_type   = "viewer-request"
+          function_arn = aws_cloudfront_function.host_redirect[0].arn
+        }
+      }
     }
   }
 
