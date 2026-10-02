@@ -14,6 +14,12 @@ variable "full_domain" {
   default     = null
 }
 
+variable "additional_aliases" {
+  description = "Extra hostnames (e.g. www.example.com) accepted by the distribution. Requests to them are redirected with a 301 to full_domain, keeping the path and every query parameter (CloudFront passes the query pre-parsed, so parameter order is not preserved and a bare `x=` becomes `x`). The certificate must cover them. Ignored when enable_custom_domain is false."
+  type        = list(string)
+  default     = []
+}
+
 variable "enable_dr" {
   description = "Whether to add the DR region as a failover origin. When false only the primary origin is configured."
   type        = bool

@@ -95,11 +95,13 @@ No modules.
 | Name | Type |
 |------|------|
 | [aws_cloudfront_distribution.main](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/cloudfront_distribution) | resource |
+| [aws_cloudfront_function.host_redirect](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/cloudfront_function) | resource |
 
 ## Inputs
 
 | Name | Description | Type | Default | Required |
 |------|-------------|------|---------|:--------:|
+| <a name="input_additional_aliases"></a> [additional\_aliases](#input\_additional\_aliases) | Extra hostnames (e.g. www.example.com) accepted by the distribution. Requests to them are redirected with a 301 to full\_domain, keeping the path and every query parameter (CloudFront passes the query pre-parsed, so parameter order is not preserved and a bare `x=` becomes `x`). The certificate must cover them. Ignored when enable\_custom\_domain is false. | `list(string)` | `[]` | no |
 | <a name="input_app_name"></a> [app\_name](#input\_app\_name) | Name prefix applied to CloudFront resources and their tags. | `string` | n/a | yes |
 | <a name="input_certificate_arn"></a> [certificate\_arn](#input\_certificate\_arn) | ARN of an ACM certificate in us-east-1 covering full\_domain. Required when enable\_custom\_domain is true. | `string` | `null` | no |
 | <a name="input_common_tags"></a> [common\_tags](#input\_common\_tags) | Tags applied to every resource this module creates. | `map(string)` | `{}` | no |
